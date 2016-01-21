@@ -72,21 +72,37 @@ var moduleFunction = function(args) {
 			next();
 			return;
 		}
-		
-		var html = qtools.fs.readFileSync(self.pageList[pageIndex].filePath);
-		html = qtools.templateReplace({
-			template: html.toString(),
-			replaceObject: self.systemParameters
-		});
 
 var extension=pageIndex.match(/\.(\w+)$/);
 	if (extension){
 		extension=extension[1];
 	}
+		
+		var html = qtools.fs.readFileSync(self.pageList[pageIndex].filePath);
+		
+		if (['html', 'css', 'js'].indexOf(extension)>-1){
+			html = qtools.templateReplace({
+				template: html.toString(),
+				replaceObject: self.systemParameters
+			});
+		}
+		
 	switch (extension){
+		case 'png':
+		res.set('Content-Type', 'image/png');
+			break;
+		case 'jpeg':
+		res.set('Content-Type', 'image/jpeg');
+			break;
+		case 'js':
+		res.set('Content-Type', 'application/javascript');
+			break;
 		case 'css':
 		res.set('Content-Type', 'text/css');
 			break;
+		case 'html':
+		res.set('Content-Type', 'text/html');
+		break;
 		default:
 		res.set('Content-Type', 'text/html');
 		break;
