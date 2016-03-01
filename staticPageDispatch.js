@@ -36,6 +36,10 @@ var moduleFunction = function(args) {
 			{
 				name: 'systemParameters',
 				optional: true
+			},
+			{
+				name: 'fileInclusionSpecs',
+				optional: true
 			}
 		]
 	});
@@ -53,6 +57,73 @@ var moduleFunction = function(args) {
 
 	//LOCAL FUNCTIONS ====================================
 
+	var genFileContentReplacementMap = function(args) {
+
+
+		var includeFileNameList = args.includeFileNameList ? args.includeFileNameList : '';
+		var modulePath = args.modulePath ? args.modulePath : '';
+		var includeDirectoryName = args.includeDirectoryName ? args.includeDirectoryName : '';
+		var parsableJavascriptReplaceString = args.parsableJavascriptReplaceString ? args.parsableJavascriptReplaceString : '';
+
+		var includeParentPath = modulePath + includeDirectoryName;
+		var includedFileMap = {};
+		for (var i = 0, len = includeFileNameList.length; i < len; i++) {
+			var filePath = includeFileNameList[i];
+			var propertyName = includeDirectoryName + filePath.replace(/\./g, '_');
+			var fileName = propertyName.match(/\/(.*)$/);
+			var fileContents = fs.readFileSync(includeParentPath + filePath, 'utf8').toString();
+			console.log(propertyName);
+
+			fileContents = fileContents.replace(new RegExp(parsableJavascriptReplaceString, 'g'), fileName[1]);
+
+			includedFileMap[propertyName] = fileContents;
+		}
+		return includedFileMap;
+	}
+
+	var initializeRoutesForFiles = function() {
+		for (var i = 0, len = self.filePathList.length; i < len; i++) {
+
+			var fileDirectoryPath = self.filePathList[i].replace(/\/+/g, '/');
+
+			walk.walkSync(fileDirectoryPath, function(basedir, filename, stat) {
+				if (filename.match(/^\./)) {
+					return;
+				}
+				var filePath = basedir + '/' + filename;
+				fileInfoList.push({
+					filename: filename,
+					filePath: filePath,
+					urlSegment: filePath.replace(fileDirectoryPath, '')
+				})
+			});
+
+			for (var j = 0, len2 = fileInfoList.length; j < len2; j++) {
+				var element = fileInfoList[j];
+
+				var fileName = element.filename;
+				var urlSegment = element.urlSegment;
+
+				urlSegment = urlSegment.replace(/^\//, '').replace(/\/+/, '/');
+				self.pageList[urlSegment] = element;
+
+				var pathName = fileName;
+				if (fileName == self.default) {
+					urlSegment = ''; //change this one into the default
+					defaultPageIndex = element.urlSegment;
+				}
+
+				self.router.get(new RegExp(urlSegment), function(req, res, next) {
+					sendTestInputPage(req, res, next);
+					return;
+				});
+
+			}
+
+		}
+	}
+
+
 	var sendTestInputPage = function(req, res, next) {
 		var pathTest = req.path.match(/(\w+).*$/);
 
@@ -61,105 +132,76 @@ var moduleFunction = function(args) {
 		} else {
 			pageIndex = (req.path == '/') ? defaultPageIndex : '';
 		}
-		
-		pageIndex=pageIndex.replace(/^\//, '').replace(/\/+/, '/');
 
+		pageIndex = pageIndex.replace(/^\//, '').replace(/\/+/, '/');
+console.log(pageIndex);
 		if (!self.pageList[pageIndex]) {
-			pageIndex=pageIndex+'.html'
+			pageIndex = pageIndex + '.html'
 		}
-		
+
 		if (!self.pageList[pageIndex]) {
 			next();
 			return;
 		}
 
-var extension=pageIndex.match(/\.(\w+)$/);
-	if (extension){
-		extension=extension[1];
-	}
-		
+
+
+		var extension = pageIndex.match(/\.(\w+)$/);
+		if (extension) {
+			extension = extension[1];
+		}
+
 		var html = qtools.fs.readFileSync(self.pageList[pageIndex].filePath);
-		
-		if (['html', 'css', 'js'].indexOf(extension)>-1){
+
+		if (['html', 'css', 'js'].indexOf(extension) > -1) {
 			html = qtools.templateReplace({
 				template: html.toString(),
-				replaceObject: self.systemParameters
+				replaceObject: self.systemParameters,
+				leaveUnmatchedTagsIntact:true
 			});
 		}
-		
-	switch (extension){
-		case 'png':
-		res.set('Content-Type', 'image/png');
-			break;
-		case 'jpeg':
-		res.set('Content-Type', 'image/jpeg');
-			break;
-		case 'js':
-		res.set('Content-Type', 'application/javascript');
-			break;
-		case 'css':
-		res.set('Content-Type', 'text/css');
-			break;
-		case 'html':
-		res.set('Content-Type', 'text/html');
-		break;
-		default:
-		res.set('Content-Type', 'text/html');
-		break;
-	}
+
+		switch (extension) {
+			case 'png':
+				res.set('Content-Type', 'image/png');
+				break;
+			case 'jpeg':
+				res.set('Content-Type', 'image/jpeg');
+				break;
+			case 'js':
+				res.set('Content-Type', 'application/javascript');
+				break;
+			case 'css':
+				res.set('Content-Type', 'text/css');
+				break;
+			case 'html':
+				res.set('Content-Type', 'text/html');
+				break;
+			default:
+				res.set('Content-Type', 'text/html');
+				break;
+		}
 
 		res.status('200').send(new Buffer(html));
 
 		//		res.status('200').sendFile(fileDirectoryPath + '/'+fileName + '.html');
 
 	};
-	var defaultPageIndex = '';
-	var fileInfoList = [];
-	self.pageList = {};
 
-	for (var i = 0, len = self.filePathList.length; i < len; i++) {
-
-		var fileDirectoryPath = self.filePathList[i].replace(/\/+/g, '/');
-
-		walk.walkSync(fileDirectoryPath, function(basedir, filename, stat) {
-			if (filename.match(/^\./)) {
-				return;
-			}
-			var filePath = basedir + '/' + filename;
-			fileInfoList.push({
-				filename: filename,
-				filePath: filePath,
-				urlSegment: filePath.replace(fileDirectoryPath, '')
-			})
-		});
-
-		for (var j = 0, len2 = fileInfoList.length; j < len2; j++) {
-			var element = fileInfoList[j];
-
-			var fileName = element.filename;
-			var urlSegment = element.urlSegment;
-			
-			urlSegment=urlSegment.replace(/^\//, '').replace(/\/+/, '/');
-			self.pageList[urlSegment] = element;
-
-			var pathName = fileName;
-			if (fileName == self.default) {
-				urlSegment = ''; //change this one into the default
-				defaultPageIndex = element.urlSegment;
-			}
-
-			self.router.get(new RegExp(urlSegment), function(req, res, next) {
-				sendTestInputPage(req, res, next);
-				return;
-			});
-
-		}
-
-	}
 
 	//METHODS AND PROPERTIES ====================================
 
 	//INITIALIZATION ====================================
+	var defaultPageIndex = '';
+	var fileInfoList = [];
+	self.pageList = {};
+
+	if (self.fileInclusionSpecs) {
+		var includedFileMap = genFileContentReplacementMap(self.fileInclusionSpecs);
+		self.systemParameters = qtools.extend(self.systemParameters, includedFileMap);
+	}
+
+	initializeRoutesForFiles();
 
 	return this;
 };
@@ -168,4 +210,6 @@ var extension=pageIndex.match(/\.(\w+)$/);
 
 util.inherits(moduleFunction, events.EventEmitter);
 module.exports = moduleFunction;
+
+
 
