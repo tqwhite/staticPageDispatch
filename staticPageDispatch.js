@@ -70,10 +70,8 @@ var moduleFunction = function(args) {
 		for (var i = 0, len = includeFileNameList.length; i < len; i++) {
 			var filePath = includeFileNameList[i];
 			var propertyName = includeDirectoryName + filePath.replace(/\./g, '_');
-			var fileName = propertyName.match(/\/(.*)$/);
+			var fileName = propertyName.match(/^.*\/(.*)$/);
 			var fileContents = fs.readFileSync(includeParentPath + filePath, 'utf8').toString();
-			console.log(propertyName);
-
 			fileContents = fileContents.replace(new RegExp(parsableJavascriptReplaceString, 'g'), fileName[1]);
 
 			includedFileMap[propertyName] = fileContents;
@@ -125,6 +123,7 @@ var moduleFunction = function(args) {
 
 
 	var sendTestInputPage = function(req, res, next) {
+
 		var pathTest = req.path.match(/(\w+).*$/);
 
 		if (pathTest && typeof (pathTest[1]) != 'undefined') {
@@ -134,7 +133,7 @@ var moduleFunction = function(args) {
 		}
 
 		pageIndex = pageIndex.replace(/^\//, '').replace(/\/+/, '/');
-console.log(pageIndex);
+
 		if (!self.pageList[pageIndex]) {
 			pageIndex = pageIndex + '.html'
 		}
@@ -150,10 +149,15 @@ console.log(pageIndex);
 		if (extension) {
 			extension = extension[1];
 		}
-
 		var html = qtools.fs.readFileSync(self.pageList[pageIndex].filePath);
 
 		if (['html', 'css', 'js'].indexOf(extension) > -1) {
+			html = qtools.templateReplace({
+				template: html.toString(),
+				replaceObject: self.systemParameters,
+				leaveUnmatchedTagsIntact:true
+			});
+			//qtools only replaces twice. Turns out I need more.
 			html = qtools.templateReplace({
 				template: html.toString(),
 				replaceObject: self.systemParameters,
