@@ -75,7 +75,7 @@ var moduleFunction = function(args) {
 			fileContents = fileContents.replace(new RegExp(parsableJavascriptReplaceString, 'g'), fileName[1]);
 			
 			if (filePath.match(/\.css$/)){
-				fileContents = fileContents.replace(/\r+/, ' ');
+				fileContents = fileContents.replace(/\n+/g, ' ');
 			}
 
 			includedFileMap[propertyName] = fileContents;
