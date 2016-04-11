@@ -73,6 +73,10 @@ var moduleFunction = function(args) {
 			var fileName = propertyName.match(/^.*\/(.*)$/);
 			var fileContents = fs.readFileSync(includeParentPath + filePath, 'utf8').toString();
 			fileContents = fileContents.replace(new RegExp(parsableJavascriptReplaceString, 'g'), fileName[1]);
+			
+			if (filePath.match(/\.css$/)){
+				fileContents = fileContents.replace(/\r+/, ' ');
+			}
 
 			includedFileMap[propertyName] = fileContents;
 		}
