@@ -1,10 +1,11 @@
 'use strict';
-var qtools = require('qtools'),
-	qtools = new qtools(module),
-	events = require('events'),
-	util = require('util'),
-	fs = require('fs'),
-	walk = require('fs-walk');
+var qtools = require('qtools');
+var qtools = new qtools(module);
+var events = require('events');
+var util = require('util');
+var fs = require('fs');
+var walk = require('fs-walk');
+var path = require('path');
 
 //START OF moduleFunction() ============================================================
 
@@ -40,12 +41,20 @@ var moduleFunction = function(args) {
 			{
 				name: 'fileInclusionSpecs',
 				optional: true
+			},
+			{
+				name: 'reportPath',
+				optional: true
+			},
+			{
+				name: 'initCallback',
+				optional: false
 			}
 		]
 	});
 
-	var self = this,
-		forceEvent = function(eventName, outData) {
+	var self = this;
+	var forceEvent = function(eventName, outData) {
 			this.emit(eventName, {
 				eventName: eventName,
 				data: outData
@@ -53,7 +62,7 @@ var moduleFunction = function(args) {
 		};
 
 	self.systemParameters = self.systemParameters ? self.systemParameters : {};
-	self.default = self.default ? self.default : 'index.html';
+	self.default = self.default ? self.default : 'XXindex.html';
 
 	//LOCAL FUNCTIONS ====================================
 
@@ -73,8 +82,8 @@ var moduleFunction = function(args) {
 			var fileName = propertyName.match(/^.*\/(.*)$/);
 			var fileContents = fs.readFileSync(includeParentPath + filePath, 'utf8').toString();
 			fileContents = fileContents.replace(new RegExp(parsableJavascriptReplaceString, 'g'), fileName[1]);
-			
-			if (filePath.match(/\.css$/)){
+
+			if (filePath.match(/\.css$/)) {
 				fileContents = fileContents.replace(/\n+/g, ' ');
 			}
 
@@ -107,6 +116,7 @@ var moduleFunction = function(args) {
 				var urlSegment = element.urlSegment;
 
 				urlSegment = urlSegment.replace(/^\//, '').replace(/\/+/, '/');
+
 				self.pageList[urlSegment] = element;
 
 				var pathName = fileName;
@@ -115,7 +125,12 @@ var moduleFunction = function(args) {
 					defaultPageIndex = element.urlSegment;
 				}
 
-				self.router.get(new RegExp(urlSegment), function(req, res, next) {
+				var urlRegexp = new RegExp(urlSegment);
+
+				if (typeof (self.reportPath) == 'function') {
+					self.reportPath(urlSegment);
+				}
+				self.router.get(urlRegexp, function(req, res, next) {
 					sendTestInputPage(req, res, next);
 					return;
 				});
@@ -159,13 +174,13 @@ var moduleFunction = function(args) {
 			html = qtools.templateReplace({
 				template: html.toString(),
 				replaceObject: self.systemParameters,
-				leaveUnmatchedTagsIntact:true
+				leaveUnmatchedTagsIntact: true
 			});
 			//qtools only replaces twice. Turns out I need more.
 			html = qtools.templateReplace({
 				template: html.toString(),
 				replaceObject: self.systemParameters,
-				leaveUnmatchedTagsIntact:true
+				leaveUnmatchedTagsIntact: true
 			});
 		}
 
@@ -174,6 +189,9 @@ var moduleFunction = function(args) {
 				res.set('Content-Type', 'image/png');
 				break;
 			case 'jpeg':
+				res.set('Content-Type', 'image/jpeg');
+				break;
+			case 'jpg':
 				res.set('Content-Type', 'image/jpeg');
 				break;
 			case 'js':
@@ -185,9 +203,22 @@ var moduleFunction = function(args) {
 			case 'html':
 				res.set('Content-Type', 'text/html');
 				break;
+			case 'pdf':
+				res.set('Content-Type', 'application/pdf');
+				break;
 			default:
 				res.set('Content-Type', 'text/html');
 				break;
+		}
+
+		let externalSwitchSays = req.query.download ? req.query.download : false;
+		externalSwitchSays=(externalSwitchSays=='true')?true:false;
+		
+		const fileName = path.parse(req.path).base;
+
+		//?download=true
+		if (externalSwitchSays) {
+			res.set('Content-Disposition', `attachment; filename=${fileName}`);
 		}
 
 		res.status('200').send(new Buffer(html));
@@ -198,6 +229,10 @@ var moduleFunction = function(args) {
 
 
 	//METHODS AND PROPERTIES ====================================
+
+	this.shutdown = (message, callback) => {
+		callback('', message);
+	}
 
 	//INITIALIZATION ====================================
 	var defaultPageIndex = '';
@@ -210,6 +245,10 @@ var moduleFunction = function(args) {
 	}
 
 	initializeRoutesForFiles();
+
+	if (typeof (this.initCallback) == 'function') {
+		this.initCallback();
+	}
 
 	return this;
 };
