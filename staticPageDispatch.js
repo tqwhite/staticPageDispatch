@@ -206,6 +206,9 @@ var moduleFunction = function(args) {
 			case 'pdf':
 				res.set('Content-Type', 'application/pdf');
 				break;
+			case 'dotx':
+				res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template');
+				break;
 			default:
 				res.set('Content-Type', 'text/html');
 				break;
